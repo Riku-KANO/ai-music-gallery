@@ -1,0 +1,100 @@
+.app {
+  width: 100%;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+}
+
+.settings-panel {
+  position: fixed;
+  top: 2rem;
+  right: 2rem;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  z-index: 100;
+  min-width: 200px;
+}
+
+.settings-panel h2 {
+  margin: 0 0 1rem 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.theme-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.theme-selector button {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.theme-selector button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.theme-selector button.active {
+  background: #61dafb;
+  color: #000;
+  border-color: #61dafb;
+}
+
+.random-button {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.random-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+}
+
+/* Mobile styles */
+@media (max-width: 768px) {
+  .settings-panel {
+    position: fixed;
+    bottom: 120px;
+    left: 1rem;
+    right: 1rem;
+    top: auto;
+    min-width: auto;
+    padding: 1rem;
+  }
+
+  .settings-panel h2 {
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .theme-selector {
+    flex-direction: row;
+    gap: 0.5rem;
+  }
+
+  .theme-selector button {
+    flex: 1;
+    font-size: 0.8rem;
+    padding: 0.4rem 0.8rem;
+  }
+}
