@@ -1,4 +1,4 @@
-export type VisualizerTheme = 'waves' | 'particles' | 'geometric' | 'abstract';
+export type VisualizerTheme = 'waves' | 'particles' | 'geometric' | 'shader';
 
 export interface VisualizerConfig {
   theme: VisualizerTheme;

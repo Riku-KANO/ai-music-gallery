@@ -98,6 +98,12 @@ function App() {
           >
             Geometric
           </button>
+          <button
+            className={visualizerConfig.theme === 'shader' ? 'active' : ''}
+            onClick={() => setVisualizerConfig({ ...visualizerConfig, theme: 'shader' })}
+          >
+            Shader
+          </button>
         </div>
         <button onClick={handleRandomPlay} className="random-button">
           Random Track

@@ -1,9 +1,140 @@
 import { useRef, useMemo } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
+import { Canvas, useFrame, extend } from '@react-three/fiber';
+import { OrbitControls, PerspectiveCamera, shaderMaterial } from '@react-three/drei';
 import * as THREE from 'three';
 import type { AudioData } from '../hooks/useAudioAnalyzer';
 import type { VisualizerConfig } from '../types/visualizer';
+
+// カスタムシェーダーマテリアル
+const AudioShaderMaterial = shaderMaterial(
+  {
+    time: 0,
+    resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
+    audioData: new Float32Array(128),
+    bass: 0,
+    mid: 0,
+    treble: 0,
+    volume: 0,
+    color1: new THREE.Color('#ff006e'),
+    color2: new THREE.Color('#8338ec'),
+    color3: new THREE.Color('#3a86ff'),
+  },
+  // Vertex Shader
+  `
+    varying vec2 vUv;
+    varying vec3 vPosition;
+    
+    void main() {
+      vUv = uv;
+      vPosition = position;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  // Fragment Shader
+  `
+    uniform float time;
+    uniform vec2 resolution;
+    uniform float audioData[128];
+    uniform float bass;
+    uniform float mid;
+    uniform float treble;
+    uniform float volume;
+    uniform vec3 color1;
+    uniform vec3 color2;
+    uniform vec3 color3;
+    
+    varying vec2 vUv;
+    varying vec3 vPosition;
+    
+    // ノイズ関数
+    float noise(vec2 p) {
+      return sin(p.x * 10.0) * sin(p.y * 10.0);
+    }
+    
+    // フラクタルパターン
+    float fractal(vec2 p) {
+      float sum = 0.0;
+      float freq = 1.0;
+      float amp = 0.5;
+      
+      for(int i = 0; i < 5; i++) {
+        sum += noise(p * freq) * amp;
+        freq *= 2.0;
+        amp *= 0.5;
+      }
+      
+      return sum;
+    }
+    
+    void main() {
+      vec2 uv = vUv;
+      vec2 center = vec2(0.5, 0.5);
+      float dist = distance(uv, center);
+      
+      // オーディオデータの影響を計算
+      float audioInfluence = 0.0;
+      for(int i = 0; i < 128; i++) {
+        float fi = float(i) / 128.0;
+        audioInfluence += audioData[i] * (1.0 - abs(fi - uv.x)) * 0.02;
+      }
+      
+      // 時間とオーディオに基づくアニメーション
+      float wave = sin(dist * 10.0 - time * 2.0 + bass * 5.0) * 0.5 + 0.5;
+      float spiral = sin(atan(uv.y - 0.5, uv.x - 0.5) * 5.0 + time + mid * 3.0) * 0.5 + 0.5;
+      float pulse = sin(time * 3.0 + dist * 20.0 * (1.0 + treble)) * volume;
+      
+      // フラクタルパターン
+      vec2 fractalCoord = uv * 5.0 + vec2(time * 0.1, 0.0);
+      float fractalPattern = fractal(fractalCoord + vec2(bass, mid));
+      
+      // リサージュ曲線
+      float lissajous = sin(uv.x * 10.0 + time + bass * 5.0) * sin(uv.y * 8.0 + time * 1.3 + mid * 3.0);
+      
+      // 放射状のパターン
+      float radial = sin(dist * 50.0 - time * 5.0 + audioInfluence * 10.0);
+      
+      // 色の混合
+      vec3 color = mix(color1, color2, wave);
+      color = mix(color, color3, spiral);
+      color += vec3(fractalPattern * 0.2);
+      color += audioInfluence * vec3(1.0, 0.5, 0.2);
+      color += vec3(lissajous * 0.1 * treble);
+      color += vec3(radial * 0.05 * volume);
+      
+      // 複数の円形レイヤー
+      float ring1 = smoothstep(0.02, 0.0, abs(dist - 0.3 - bass * 0.1));
+      float ring2 = smoothstep(0.01, 0.0, abs(dist - 0.2 - mid * 0.05));
+      float ring3 = smoothstep(0.005, 0.0, abs(dist - 0.1 - treble * 0.02));
+      
+      color += vec3(ring1) * color1 * 2.0;
+      color += vec3(ring2) * color2 * 1.5;
+      color += vec3(ring3) * color3 * 1.0;
+      
+      // 円形のマスク
+      float mask = smoothstep(0.5, 0.45, dist);
+      
+      // グロー効果
+      float glow = exp(-dist * 3.0) * (0.5 + volume * 0.5);
+      color += vec3(glow) * color * 0.5;
+      
+      // 最終出力
+      float alpha = mask * (0.8 + pulse * 0.2) + (ring1 + ring2 + ring3) * 0.5;
+      gl_FragColor = vec4(color, alpha);
+    }
+  `,
+);
+
+// TypeScriptのための型拡張
+extend({ AudioShaderMaterial });
+
+// Three.jsのJSX要素の型宣言
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      audioShaderMaterial: any;
+    }
+  }
+}
 
 interface VisualizerProps {
   getAudioData: () => AudioData;
@@ -367,6 +498,63 @@ const ParticleVisualization: React.FC<VisualizationProps> = ({ getAudioData, con
   );
 };
 
+const ShaderVisualization: React.FC<VisualizationProps> = ({ getAudioData, config }) => {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const materialRef = useRef<any>(null);
+  const timeRef = useRef(0);
+
+  useFrame(() => {
+    if (!materialRef.current) return;
+
+    timeRef.current += 0.01;
+    const audioData = getAudioData();
+
+    // シェーダーのユニフォームを更新
+    materialRef.current.uniforms.time.value = timeRef.current;
+    materialRef.current.uniforms.bass.value = audioData.bass;
+    materialRef.current.uniforms.mid.value = audioData.mid;
+    materialRef.current.uniforms.treble.value = audioData.treble;
+    materialRef.current.uniforms.volume.value = audioData.volume;
+
+    // オーディオデータを配列として渡す
+    const frequencyData = new Float32Array(128);
+    for (let i = 0; i < 128; i++) {
+      frequencyData[i] = (audioData.frequency[i] || 0) / 255;
+    }
+    materialRef.current.uniforms.audioData.value = frequencyData;
+
+    // カラースキームを更新
+    materialRef.current.uniforms.color1.value = new THREE.Color(config.colorScheme[0]);
+    materialRef.current.uniforms.color2.value = new THREE.Color(config.colorScheme[1]);
+    materialRef.current.uniforms.color3.value = new THREE.Color(config.colorScheme[2]);
+
+    // メッシュの回転
+    if (meshRef.current) {
+      meshRef.current.rotation.z += audioData.volume * 0.01;
+    }
+  });
+
+  return (
+    <group>
+      <mesh ref={meshRef}>
+        <planeGeometry args={[20, 20, 128, 128]} />
+        <audioShaderMaterial
+          ref={materialRef}
+          transparent
+          side={THREE.DoubleSide}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* 追加の3Dエフェクト */}
+      <mesh position={[0, 0, -5]}>
+        <planeGeometry args={[25, 25]} />
+        <meshBasicMaterial color="#000033" opacity={0.8} transparent />
+      </mesh>
+    </group>
+  );
+};
+
 const GeometricVisualization: React.FC<VisualizationProps> = ({ getAudioData, config }) => {
   const groupRef = useRef<THREE.Group>(null);
   const cubeRef = useRef<THREE.Mesh>(null);
@@ -510,6 +698,8 @@ const Visualization: React.FC<VisualizationProps> = ({ getAudioData, config }) =
       return <ParticleVisualization getAudioData={getAudioData} config={config} />;
     case 'geometric':
       return <GeometricVisualization getAudioData={getAudioData} config={config} />;
+    case 'shader':
+      return <ShaderVisualization getAudioData={getAudioData} config={config} />;
     default:
       return <WaveVisualization getAudioData={getAudioData} config={config} />;
   }
