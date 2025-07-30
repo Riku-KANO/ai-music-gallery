@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Track } from '../types/music';
+import { useIsMobile } from '../hooks/useMediaQuery';
 import './TrackGallery.css';
 
 interface TrackGalleryProps {
@@ -16,16 +17,29 @@ export const TrackGallery: React.FC<TrackGalleryProps> = ({
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const isMobile = useIsMobile();
   const containerRef = useRef<HTMLDivElement>(null);
   const itemsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (containerRef.current && itemsRef.current) {
-      const itemWidth = containerRef.current.clientWidth;
-      const targetScroll = currentTrackIndex * itemWidth;
-      itemsRef.current.style.transform = `translateX(-${targetScroll}px)`;
+      // モバイルとデスクトップで異なる計算方法を使用
+      if (isMobile) {
+        // モバイルではビューポートの幅を使用
+        const viewportElement = containerRef.current.querySelector('.track-gallery-viewport');
+        if (viewportElement) {
+          const itemWidth = viewportElement.clientWidth;
+          const targetScroll = currentTrackIndex * itemWidth;
+          itemsRef.current.style.transform = `translateX(-${targetScroll}px)`;
+        }
+      } else {
+        // デスクトップでは全体の幅を使用
+        const itemWidth = containerRef.current.clientWidth;
+        const targetScroll = currentTrackIndex * itemWidth;
+        itemsRef.current.style.transform = `translateX(-${targetScroll}px)`;
+      }
     }
-  }, [currentTrackIndex]);
+  }, [currentTrackIndex, isMobile]);
 
   const handleStart = (clientX: number) => {
     if (!containerRef.current) return;
@@ -34,20 +48,30 @@ export const TrackGallery: React.FC<TrackGalleryProps> = ({
   };
 
   const handleMove = (clientX: number) => {
-    if (!isDragging || !itemsRef.current) return;
+    if (!isDragging || !itemsRef.current || !containerRef.current) return;
     const x = clientX - startX;
     setScrollLeft(x);
-    itemsRef.current.style.transform = `translateX(${x}px)`;
+
+    // 現在の位置を計算
+    const viewportElement = containerRef.current.querySelector('.track-gallery-viewport');
+    const itemWidth =
+      isMobile && viewportElement ? viewportElement.clientWidth : containerRef.current.clientWidth;
+    const currentTranslate = -currentTrackIndex * itemWidth;
+
+    itemsRef.current.style.transform = `translateX(${currentTranslate + x}px)`;
   };
 
   const handleEnd = () => {
     if (!isDragging || !containerRef.current || !itemsRef.current) return;
     setIsDragging(false);
 
-    const itemWidth = containerRef.current.clientWidth;
+    // ビューポートまたはコンテナの幅を取得
+    const viewportElement = containerRef.current.querySelector('.track-gallery-viewport');
+    const itemWidth =
+      isMobile && viewportElement ? viewportElement.clientWidth : containerRef.current.clientWidth;
+
     const threshold = itemWidth * 0.2;
-    const currentTranslate = -currentTrackIndex * itemWidth;
-    const diff = scrollLeft - currentTranslate;
+    const diff = scrollLeft;
 
     let newIndex = currentTrackIndex;
     if (diff < -threshold && currentTrackIndex < tracks.length - 1) {
@@ -74,14 +98,27 @@ export const TrackGallery: React.FC<TrackGalleryProps> = ({
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (isMobile) {
+      // モバイルでのタッチスクロールを無効化
+      // 代わりにナビゲーションボタンを使用
+      return;
+    }
     handleStart(e.touches[0].clientX);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
+    if (isMobile) {
+      // モバイルでのタッチスクロールを無効化
+      return;
+    }
     handleMove(e.touches[0].clientX);
   };
 
   const handleTouchEnd = () => {
+    if (isMobile) {
+      // モバイルでのタッチスクロールを無効化
+      return;
+    }
     handleEnd();
   };
 
@@ -111,7 +148,12 @@ export const TrackGallery: React.FC<TrackGalleryProps> = ({
     >
       <button
         className="nav-button nav-button-prev"
-        onClick={() => onTrackChange(Math.max(0, currentTrackIndex - 1))}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (currentTrackIndex > 0) {
+            onTrackChange(currentTrackIndex - 1);
+          }
+        }}
         disabled={currentTrackIndex === 0}
         aria-label="Previous track"
       >
@@ -122,7 +164,10 @@ export const TrackGallery: React.FC<TrackGalleryProps> = ({
         <div
           ref={itemsRef}
           className="track-gallery-items"
-          style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+          style={{
+            cursor: isDragging ? 'grabbing' : 'grab',
+            transition: isDragging ? 'none' : 'transform 0.3s ease',
+          }}
         >
           {tracks.map((track, index) => (
             <div
@@ -145,7 +190,12 @@ export const TrackGallery: React.FC<TrackGalleryProps> = ({
 
       <button
         className="nav-button nav-button-next"
-        onClick={() => onTrackChange(Math.min(tracks.length - 1, currentTrackIndex + 1))}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (currentTrackIndex < tracks.length - 1) {
+            onTrackChange(currentTrackIndex + 1);
+          }
+        }}
         disabled={currentTrackIndex === tracks.length - 1}
         aria-label="Next track"
       >

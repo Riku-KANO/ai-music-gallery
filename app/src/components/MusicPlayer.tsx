@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Track } from '../types/music';
+import { useAudioLoader } from '../hooks/useAudioLoader';
 import './MusicPlayer.css';
 
 interface MusicPlayerProps {
@@ -20,6 +21,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   const [currentTime, setCurrentTime] = useState(0);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { error: loadError, retry } = useAudioLoader(audioRef.current);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -122,13 +124,35 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
       </div>
 
       <div className="player-controls">
-        <button
-          onClick={togglePlayPause}
-          aria-label={isPlaying ? 'Pause' : 'Play'}
-          disabled={isLoading}
-        >
-          {isLoading ? 'Loading...' : isPlaying ? 'Pause' : 'Play'}
-        </button>
+        {loadError ? (
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ color: '#ff6b6b', fontSize: '0.8rem', margin: '0.5rem 0' }}>
+              Failed to load audio
+            </p>
+            <button
+              onClick={retry}
+              style={{
+                padding: '0.25rem 0.5rem',
+                fontSize: '0.8rem',
+                background: '#ff6b6b',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={togglePlayPause}
+            aria-label={isPlaying ? 'Pause' : 'Play'}
+            disabled={isLoading}
+          >
+            {isLoading ? 'Loading...' : isPlaying ? 'Pause' : 'Play'}
+          </button>
+        )}
       </div>
 
       <div className="progress-section">

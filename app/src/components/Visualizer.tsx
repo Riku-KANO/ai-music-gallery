@@ -1,9 +1,10 @@
 import { useRef, useMemo } from 'react';
-import { Canvas, useFrame, extend } from '@react-three/fiber';
+import { Canvas, useFrame, extend, ReactThreeFiber } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, shaderMaterial } from '@react-three/drei';
 import * as THREE from 'three';
 import type { AudioData } from '../hooks/useAudioAnalyzer';
 import type { VisualizerConfig } from '../types/visualizer';
+import type { AudioShaderMaterial } from '../types/three';
 
 // カスタムシェーダーマテリアル
 const AudioShaderMaterial = shaderMaterial(
@@ -128,11 +129,15 @@ const AudioShaderMaterial = shaderMaterial(
 extend({ AudioShaderMaterial });
 
 // Three.jsのJSX要素の型宣言
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      audioShaderMaterial: any;
-    }
+declare module '@react-three/fiber' {
+  interface ThreeElements {
+    audioShaderMaterial: ReactThreeFiber.Object3DNode<THREE.ShaderMaterial, typeof THREE.ShaderMaterial> & {
+      time?: number;
+      audioData?: Float32Array;
+      bass?: number;
+      mid?: number;
+      treble?: number;
+    };
   }
 }
 
@@ -500,7 +505,7 @@ const ParticleVisualization: React.FC<VisualizationProps> = ({ getAudioData, con
 
 const ShaderVisualization: React.FC<VisualizationProps> = ({ getAudioData, config }) => {
   const meshRef = useRef<THREE.Mesh>(null);
-  const materialRef = useRef<any>(null);
+  const materialRef = useRef<AudioShaderMaterial>(null);
   const timeRef = useRef(0);
 
   useFrame(() => {
